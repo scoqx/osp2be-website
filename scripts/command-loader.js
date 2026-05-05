@@ -61,8 +61,6 @@ async function loadConfig() {
   // Проверяем, является ли устройство мобильным
   const isMobile = window.innerWidth <= 768;
   
-  console.log('🔍 Loading config:', filename);
-  console.log('📱 Is mobile:', isMobile);
 
   const response = await fetch(filename + "?v=" + Date.now());
   const text = await response.text();
@@ -182,7 +180,6 @@ async function loadConfig() {
 
   // Получаем максимальную ширину имени команды только для десктопа
   const maxCommandWidth = isMobile ? 0 : getMaxCommandNameWidth(entries);
-  console.log(`Максимальная ширина имени команды: ${maxCommandWidth.toFixed(2)}px`);
 
   // Генерация HTML
   let html = "";
@@ -233,10 +230,6 @@ async function loadConfig() {
   }
 
   document.getElementById("commands-content").innerHTML = html;
-  
-  // Выводим статистику в консоль
-  console.log(`Всего команд: ${entries.length}`);
-  console.log(`Максимальная ширина: ${maxCommandWidth.toFixed(2)}px`);
   
   // Инициализируем поиск
   initializeSearch(entries);
@@ -323,6 +316,8 @@ function initializeSearch(entries) {
   const searchInput = document.getElementById('command-search');
   const clearBtn = document.getElementById('clear-search');
   const resultsCount = document.getElementById('search-results-count');
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  const enableHighlight = true;
   
   if (!searchInput || !clearBtn || !resultsCount) return;
   
@@ -336,15 +331,29 @@ function initializeSearch(entries) {
     }
   }
   
+  function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function normalizeSearchQuery(query) {
+    return query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  }
+
   // Функция подсветки текста
-  function highlightText(element, query) {
-    if (!query || !element) return;
+  function highlightText(element, queryTokens) {
+    if (!enableHighlight || !queryTokens.length || !element) return;
     
     // Сначала очищаем предыдущие выделения, чтобы получить чистый текст
     clearHighlight(element);
     
     const text = element.textContent;
-    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const pattern = queryTokens
+      .map(escapeRegExp)
+      .sort((a, b) => b.length - a.length)
+      .join('|');
+    if (!pattern) return;
+
+    const regex = new RegExp(`(${pattern})`, 'gi');
     const highlightedText = text.replace(regex, '<mark class="search-highlight">$1</mark>');
     
     if (highlightedText !== text) {
@@ -354,7 +363,7 @@ function initializeSearch(entries) {
   
   // Функция очистки подсветки
   function clearHighlight(element) {
-    if (!element) return;
+    if (!enableHighlight || !element) return;
     
     const marks = element.querySelectorAll('mark.search-highlight');
     marks.forEach(mark => {
@@ -362,67 +371,84 @@ function initializeSearch(entries) {
     });
   }
   
+  const commandBlocks = Array.from(document.querySelectorAll('.command-block'));
+  const searchIndex = commandBlocks.map((block) => {
+    const commandName = block.querySelector('code.command-name');
+    const commandArg = block.querySelector('code.command-arg');
+    const description = block.querySelector('.command-description');
+    const commandNameText = commandName?.textContent.toLowerCase() || '';
+    const commandArgText = commandArg?.textContent.toLowerCase() || '';
+    const descriptionText = description?.textContent.toLowerCase() || '';
+    const searchText = `${commandNameText} ${commandArgText} ${descriptionText}`;
+
+    return {
+      block,
+      commandName,
+      commandArg,
+      description,
+      searchText,
+    };
+  });
+
+  let previousQuery = '';
+
   // Функция поиска
   function performSearch() {
     const query = searchInput.value.toLowerCase().trim();
-    const commandBlocks = document.querySelectorAll('.command-block');
+    const queryTokens = normalizeSearchQuery(query);
     let visibleCount = 0;
     
-    if (query === '') {
+    if (queryTokens.length === 0) {
       // Показываем все команды и очищаем подсветку
-      commandBlocks.forEach(block => {
+      searchIndex.forEach(({ block, commandName, commandArg, description }) => {
         block.classList.remove('hidden');
         visibleCount++;
         
-        // Очищаем подсветку
-        const commandName = block.querySelector('code.command-name');
-        const commandArg = block.querySelector('code.command-arg');
-        const description = block.querySelector('.command-description');
-        
-        if (commandName) clearHighlight(commandName);
-        if (commandArg) clearHighlight(commandArg);
-        if (description) clearHighlight(description);
+        if (previousQuery !== '') {
+          if (commandName) clearHighlight(commandName);
+          if (commandArg) clearHighlight(commandArg);
+          if (description) clearHighlight(description);
+        }
       });
     } else {
       // Ищем по запросу и подсвечиваем
-      commandBlocks.forEach(block => {
-        const commandName = block.querySelector('code.command-name');
-        const commandArg = block.querySelector('code.command-arg');
-        const description = block.querySelector('.command-description');
-        
-        // Сначала очищаем предыдущие выделения перед проверкой совпадений
+      searchIndex.forEach(({ block, commandName, commandArg, description, searchText }) => {
         if (commandName) clearHighlight(commandName);
         if (commandArg) clearHighlight(commandArg);
         if (description) clearHighlight(description);
-        
-        const commandNameText = commandName?.textContent.toLowerCase() || '';
-        const commandArgText = commandArg?.textContent.toLowerCase() || '';
-        const descriptionText = description?.textContent.toLowerCase() || '';
-        
-        // Поиск в любом месте (неточный поиск)
-        const searchText = `${commandNameText} ${commandArgText} ${descriptionText}`;
-        const isMatch = searchText.includes(query);
+
+        const isMatch = queryTokens.every(token => searchText.includes(token));
         
         if (isMatch) {
           block.classList.remove('hidden');
           visibleCount++;
           
           // Подсвечиваем найденный текст
-          if (commandName) highlightText(commandName, query);
-          if (commandArg) highlightText(commandArg, query);
-          if (description) highlightText(description, query);
+          if (commandName) highlightText(commandName, queryTokens);
+          if (commandArg) highlightText(commandArg, queryTokens);
+          if (description) highlightText(description, queryTokens);
         } else {
           block.classList.add('hidden');
         }
       });
     }
     
+    previousQuery = query;
     updateResultsCount(visibleCount, entries.length);
   }
+
+  function debounce(fn, delay) {
+    let timer = null;
+    return function debounced(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+  }
+
+  const debouncedSearch = debounce(performSearch, isMobile ? 140 : 60);
   
   // Обработчики событий
-  searchInput.addEventListener('input', performSearch);
-  searchInput.addEventListener('keyup', performSearch);
+  searchInput.addEventListener('input', debouncedSearch);
   
   clearBtn.addEventListener('click', () => {
     searchInput.value = '';

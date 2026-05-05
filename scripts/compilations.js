@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         const response = await fetch('/images/compilations-config.json');
         compilationsConfig = await response.json();
-        console.log('Compilations config loaded:', compilationsConfig);
     } catch (error) {
         console.error('Failed to load compilations config:', error);
         return;

@@ -35,7 +35,6 @@ class Gallery {
             const response = await fetch('/images/gallery-config.json');
             if (response.ok) {
                 const data = await response.json();
-                console.log('Loaded config:', data);
                 
                 // Add images from JSON with thumbnail paths
                 const jsonImages = data.images.sort((a, b) => a.order - b.order).map(img => {
@@ -99,14 +98,12 @@ class Gallery {
         `;
         
         document.body.appendChild(loadingOverlay);
-        console.log('🔄 Gallery loading started');
     }
     
     hideLoadingState() {
         const loadingOverlay = document.getElementById('galleryLoadingOverlay');
         if (loadingOverlay) {
             loadingOverlay.remove();
-            console.log('✅ Gallery loading completed');
         }
     }
     
@@ -179,7 +176,6 @@ class Gallery {
             // Set up image loading
             const img = new Image();
             img.onload = () => {
-                console.log('Image loaded:', image.src);
                 mainImage.src = image.src;
                 mainImage.alt = image.title;
                 mainImage.classList.remove('loading');

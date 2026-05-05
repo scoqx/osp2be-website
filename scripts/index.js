@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Check if nocache parameter is present (for manual cache clearing)
     else if (urlParams.has('nocache') && !sessionStorage.getItem('cache_clearing')) {
-        console.log('🚫 No-cache mode detected, clearing all caches...');
         clearCache();
     }
     
@@ -23,7 +22,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // Clear cache function
 async function clearCache() {
     try {
-        console.log('🚀 Enhanced Cache Clear Service started');
         
         // Set flag to prevent infinite loop
         sessionStorage.setItem('cache_clearing', 'true');
@@ -32,30 +30,23 @@ async function clearCache() {
         showMessage('Initializing complete cache cleanup...', 'working');
         
         // Step 1: Clear Service Worker cache
-        console.log('🧹 Clearing Service Worker cache...');
         if ('caches' in window) {
             const cacheNames = await caches.keys();
             await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
-            console.log('✅ Service Worker cache cleared');
         }
         await delay(500);
         
         // Step 2: Clear localStorage
-        console.log('🗄️ Clearing localStorage...');
         localStorage.clear();
-        console.log('✅ localStorage cleared');
         await delay(500);
         
         // Step 3: Clear sessionStorage
-        console.log('💾 Clearing sessionStorage...');
         const cacheClearingFlag = sessionStorage.getItem('cache_clearing');
         sessionStorage.clear();
         sessionStorage.setItem('cache_clearing', cacheClearingFlag);
-        console.log('✅ sessionStorage cleared');
         await delay(500);
         
         // Step 4: Clear IndexedDB
-        console.log('🗃️ Clearing IndexedDB...');
         if ('indexedDB' in window) {
             try {
                 const databases = await indexedDB.databases();
@@ -66,15 +57,14 @@ async function clearCache() {
                         deleteReq.onerror = () => reject(deleteReq.error);
                     });
                 }));
-                console.log('✅ IndexedDB cleared');
+                
             } catch (e) {
-                console.log('⚠️ IndexedDB clearing failed:', e);
+                
             }
         }
         await delay(500);
         
         // Step 5: Clear domain-specific data
-        console.log('🌐 Clearing domain-specific data...');
         
         // Clear all cookies for the domain
         document.cookie.split(";").forEach(function(c) { 
@@ -98,27 +88,25 @@ async function clearCache() {
                 window.thumbnailOptimizer.clearCache();
             }
             
-            console.log('✅ Domain-specific data cleared');
+            
         } catch (e) {
-            console.log('⚠️ Domain-specific clearing failed:', e);
+            
         }
         await delay(500);
         
         // Step 6: Unregister Service Workers
-        console.log('⚙️ Unregistering Service Workers...');
         if ('serviceWorker' in navigator) {
             try {
                 const registrations = await navigator.serviceWorker.getRegistrations();
                 await Promise.all(registrations.map(registration => registration.unregister()));
-                console.log('✅ Service Workers unregistered');
+                
             } catch (e) {
-                console.log('⚠️ Service Worker unregistration failed:', e);
+                
             }
         }
         await delay(500);
         
         // Step 7: Redirect to updated page
-        console.log('🔄 Redirecting to updated page...');
         showMessage('Cache cleared successfully! Redirecting...', 'success');
         
         setTimeout(() => {
@@ -251,14 +239,12 @@ function reverseChangelogOrder(text) {
 // Load changelog
 async function loadChangelog() {
     try {
-        console.log('🔍 Loading changelog...');
         const response = await fetch('/assets/changelog_be.txt?v=' + Date.now(), {
             cache: 'no-cache',
             headers: {
                 'Cache-Control': 'no-cache'
             }
         });
-        console.log('🔍 Changelog response status:', response.status);
         const text = await response.text();
         const changelogEl = document.getElementById('changelog-content');
         
@@ -266,7 +252,6 @@ async function loadChangelog() {
             // Parse and reverse changelog entries
             const reversedText = reverseChangelogOrder(text);
             changelogEl.innerHTML = reversedText;
-            console.log('🔍 Changelog loaded and reversed successfully');
             // Initialize search after changelog is loaded
             initializeChangelogSearch();
         }
@@ -292,7 +277,6 @@ function initializeChangelogSearch() {
     const totalCount = versionBlocks.length;
     
     if (totalCount === 0) {
-        console.warn('No version blocks found for search');
         return;
     }
     

@@ -288,7 +288,6 @@
             }
             
             init() {
-                console.log('🚀 Cache Clear Service initialized');
                 this.startClearing();
             }
             
@@ -328,12 +327,10 @@
             
             async clearServiceWorkerCache() {
                 this.updateProgress(1, 'active');
-                console.log('🧹 Clearing Service Worker cache...');
                 
                 if ('caches' in window) {
                     const cacheNames = await caches.keys();
                     await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
-                    console.log('✅ Service Worker cache cleared');
                 }
                 
                 this.updateProgress(1, 'completed');
@@ -342,10 +339,8 @@
             
             async clearLocalStorage() {
                 this.updateProgress(2, 'active');
-                console.log('🗄️ Clearing localStorage...');
                 
                 localStorage.clear();
-                console.log('✅ localStorage cleared');
                 
                 this.updateProgress(2, 'completed');
                 await this.delay(500);
@@ -353,10 +348,8 @@
             
             async clearSessionStorage() {
                 this.updateProgress(3, 'active');
-                console.log('💾 Clearing sessionStorage...');
                 
                 sessionStorage.clear();
-                console.log('✅ sessionStorage cleared');
                 
                 this.updateProgress(3, 'completed');
                 await this.delay(500);
@@ -364,7 +357,6 @@
             
             async clearIndexedDB() {
                 this.updateProgress(4, 'active');
-                console.log('🗃️ Clearing IndexedDB...');
                 
                 if ('indexedDB' in window) {
                     try {
@@ -376,9 +368,9 @@
                                 deleteReq.onerror = () => reject(deleteReq.error);
                             });
                         }));
-                        console.log('✅ IndexedDB cleared');
+                        
                     } catch (e) {
-                        console.log('⚠️ IndexedDB clearing failed:', e);
+                        
                     }
                 }
                 
@@ -388,7 +380,6 @@
             
             async clearDomainSpecificData() {
                 this.updateProgress(5, 'active');
-                console.log('🌐 Clearing domain-specific data...');
                 
                 // Clear all cookies for the domain
                 document.cookie.split(";").forEach(function(c) { 
@@ -412,9 +403,9 @@
                         window.thumbnailOptimizer.clearCache();
                     }
                     
-                    console.log('✅ Domain-specific data cleared');
+                    
                 } catch (e) {
-                    console.log('⚠️ Domain-specific clearing failed:', e);
+                    
                 }
                 
                 this.updateProgress(5, 'completed');
@@ -423,15 +414,14 @@
             
             async unregisterServiceWorkers() {
                 this.updateProgress(6, 'active');
-                console.log('⚙️ Unregistering Service Workers...');
                 
                 if ('serviceWorker' in navigator) {
                     try {
                         const registrations = await navigator.serviceWorker.getRegistrations();
                         await Promise.all(registrations.map(registration => registration.unregister()));
-                        console.log('✅ Service Workers unregistered');
+                        
                     } catch (e) {
-                        console.log('⚠️ Service Worker unregistration failed:', e);
+                        
                     }
                 }
                 
@@ -441,7 +431,6 @@
             
             async redirectToUpdatedPage() {
                 this.updateProgress(7, 'active');
-                console.log('🔄 Redirecting to updated page...');
                 
                 document.getElementById('status').className = 'cache-status success';
                 document.getElementById('status').textContent = 'Cache cleared successfully! Redirecting...';

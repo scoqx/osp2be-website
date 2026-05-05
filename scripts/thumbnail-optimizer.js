@@ -36,7 +36,6 @@ class ThumbnailOptimizer {
             large: isMobile ? 800 : 600
         };
         
-        console.log(`📱 Thumbnail quality updated: ${(this.quality * 100).toFixed(0)}% for ${isMobile ? 'mobile' : 'desktop'}`);
     }
     
     /**
@@ -161,7 +160,6 @@ class ThumbnailOptimizer {
             img.src = `${originalSrc}?v=${timestamp}&firefox=1`;
             img.classList.remove('loading');
             img.classList.add('loaded');
-            console.log('🦊 Firefox image element created:', img.src);
             return img;
         }
         
@@ -257,7 +255,6 @@ class ThumbnailOptimizer {
             // Кэшируем результат
             this.thumbnailCache.set(cacheKey, optimizedSrc);
             
-            console.log('🦊 Firefox thumbnail created:', optimizedSrc);
             return optimizedSrc;
         } catch (error) {
             console.warn('Failed to create Firefox thumbnail for:', imageSrc, error);

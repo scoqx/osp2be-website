@@ -72,7 +72,6 @@ class PreviewModule {
                 // Для Firefox просто используем оригинальное изображение с параметром
                 const timestamp = Date.now();
                 previewImage.src = `${image.src}?v=${timestamp}&preview=1`;
-                console.log('🦊 Firefox preview using original image');
             } else {
                 // Для других браузеров используем оптимизированное изображение
                 try {

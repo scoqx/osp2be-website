@@ -20,7 +20,6 @@
                 
                 // Save to localStorage
                 localStorage.setItem('preferredLanguage', lang);
-                console.log('Language preference saved:', lang);
             });
         });
     }

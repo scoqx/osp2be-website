@@ -38,7 +38,6 @@ class NavigationManager {
     init() {
         this.updateActiveLinks();
         this.setupEventListeners();
-        console.log(`🧭 Navigation initialized for page: ${this.currentPage}`);
     }
     
     /**
@@ -55,9 +54,6 @@ class NavigationManager {
         const activeLink = this.getActiveLink();
         if (activeLink) {
             activeLink.classList.add('active');
-            console.log(`✅ Active link set: ${activeLink.textContent.trim()}`);
-        } else {
-            console.warn('⚠️ No active link found for current page');
         }
     }
     

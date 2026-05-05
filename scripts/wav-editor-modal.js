@@ -1062,14 +1062,12 @@
                 return new Promise((resolve, reject) => {
                     const clearRequest = store.clear();
                     clearRequest.onsuccess = () => {
-                        console.log('Cleared saved state (no files)');
                         resolve();
                     };
                     clearRequest.onerror = () => reject(clearRequest.error);
                 });
             }
             
-            console.log(`Saving state: ${audioFiles.length} files`);
             
             // Clear existing data first
             await new Promise((resolve, reject) => {
@@ -1132,7 +1130,6 @@
             // Wait for transaction to complete
             await new Promise((resolve, reject) => {
                 tx.oncomplete = () => {
-                    console.log(`State saved successfully: ${audioFiles.length} files`);
                     resolve();
                 };
                 tx.onerror = () => reject(tx.error);
@@ -1162,7 +1159,6 @@
             });
             
             if (allData.length === 0) {
-                console.log('No saved state found');
                 return false; // No saved state
             }
             
@@ -1174,11 +1170,9 @@
             const fileDataArray = allData.filter(d => d.id !== '__activeFileId__');
             
             if (fileDataArray.length === 0) {
-                console.log('No files in saved state');
                 return false;
             }
             
-            console.log(`Loading ${fileDataArray.length} files from saved state`);
             
             // Restore files
             audioFiles = [];
@@ -1213,7 +1207,6 @@
             }
             
             if (audioFiles.length === 0) {
-                console.log('No files successfully restored');
                 return false;
             }
             
@@ -1224,7 +1217,6 @@
                 activeFileId = audioFiles[0].id;
             }
             
-            console.log(`Successfully loaded ${audioFiles.length} files, active: ${activeFileId}`);
             return true;
         } catch (error) {
             console.error('Failed to load state:', error);
