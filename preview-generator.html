@@ -175,6 +175,13 @@
             <button id="downloadAllBtn" class="button" disabled>Скачать все обработанные (ZIP)</button>
             <button id="downloadSelectedBtn" class="button" disabled>Скачать выбранные сборки (ZIP)</button>
             
+            <div style="margin: 15px 0;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="forceProcessCheckbox" style="margin-right: 10px; width: 18px; height: 18px;">
+                    <span>Принудительная обработка (перезаписать существующие превью)</span>
+                </label>
+            </div>
+            
             <div class="status" id="status">Выберите источник изображений</div>
             <div class="progress" id="progressContainer" style="display: none;">
                 <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
@@ -200,6 +207,12 @@
         let currentMode = null; // 'compilations' or 'gallery'
         let processedImages = [];
         let allProcessedImages = [];
+        let forceProcess = false; // Флаг принудительной обработки
+
+        // Обработчик чекбокса принудительной обработки
+        document.getElementById('forceProcessCheckbox').addEventListener('change', (e) => {
+            forceProcess = e.target.checked;
+        });
 
         document.getElementById('loadCompilationsBtn').addEventListener('click', async () => {
             const statusEl = document.getElementById('status');
@@ -396,8 +409,8 @@
                     // Проверка существования thumbnail файла
                     const thumbnailExists = await checkFileExists(thumbnailPath);
                     
-                    if (thumbnailExists) {
-                        // Пропускаем, если thumbnail уже существует
+                    if (thumbnailExists && !forceProcess) {
+                        // Пропускаем, если thumbnail уже существует и не включена принудительная обработка
                         const skippedItem = document.createElement('div');
                         skippedItem.className = 'preview-item';
                         skippedItem.style.opacity = '0.6';
@@ -558,8 +571,8 @@
                 // Проверка существования thumbnail файла
                 const thumbnailExists = await checkFileExists(thumbnailPath);
                 
-                if (thumbnailExists) {
-                    // Пропускаем, если thumbnail уже существует
+                if (thumbnailExists && !forceProcess) {
+                    // Пропускаем, если thumbnail уже существует и не включена принудительная обработка
                     const skippedItem = document.createElement('div');
                     skippedItem.className = 'preview-item';
                     skippedItem.style.opacity = '0.6';
