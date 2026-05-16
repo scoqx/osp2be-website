@@ -113,6 +113,14 @@
   .menuhq-tool-app #menuhqBuildBtn:disabled { opacity: .45; cursor: not-allowed; }
   .menuhq-tool-app #menuhqStatus { margin-top: 8px; font-size: .78rem; color: rgba(255,255,255,0.75); white-space: pre-wrap; }
   .menuhq-tool-app .menuhq-title-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .menuhq-tool-app .tool-credits {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    text-align: center;
+    font-size: .7rem;
+    color: rgba(255,255,255,0.5);
+  }
 </style>
 
 <div class="menuhq-tool-app">
@@ -168,6 +176,7 @@
       </div>
     </div>
   </div>
+  <div class="tool-credits">${isRu ? 'Сделано' : 'Created by'} <strong>diwoc</strong></div>
 </div>
 
 <canvas id="menuhqWorkCanvas" style="display:none"></canvas>

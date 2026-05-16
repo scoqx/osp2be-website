@@ -4,15 +4,15 @@
     
     // Хранилище состояния изменений для каждого инструмента
     const changeState = {
-        'config-editor': {
-            hasChanges: false,
-            isCompleted: false
-        },
         'skybox': {
             hasChanges: false,
             isCompleted: false
         },
         'q3gfx': {
+            hasChanges: false,
+            isCompleted: false
+        },
+        'md3model': {
             hasChanges: false,
             isCompleted: false
         }

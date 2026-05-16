@@ -51,6 +51,10 @@ html, body {
     box-sizing: border-box;
 }
 
+.tool-section.clickable {
+    cursor: pointer;
+}
+
 @media (max-width: 900px) {
     .tool-section {
         width: calc(50% - var(--spacing-md));
@@ -78,7 +82,6 @@ html, body {
     display: flex;
     align-items: flex-start;
 }
-
 .cfg-injector-container {
     background-color: rgba(255, 255, 255, 0.05);
     border: 2px solid var(--border-color);

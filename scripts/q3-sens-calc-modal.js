@@ -34,6 +34,14 @@
   .q3sens-field small { display: block; font-size: .72rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
   .q3sens-side .q3sens-field input[type="number"] { max-width: 120px; }
   .q3sens-flash { outline: 2px solid var(--accent) !important; outline-offset: 1px; box-shadow: 0 0 14px rgba(0,170,0,0.55); }
+  .q3sens-tool-app .tool-credits {
+    margin-top: 12px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    text-align: center;
+    font-size: .7rem;
+    color: rgba(255,255,255,0.5);
+  }
 </style>
 
 <div class="q3sens-tool-app">
@@ -63,6 +71,7 @@
       </div>
     </div>
   </div>
+  <div class="tool-credits">${isRu ? 'Сделано' : 'Created by'} <strong>diwoc</strong></div>
 </div>
 `;
     }

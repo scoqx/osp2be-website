@@ -214,6 +214,19 @@
         return parts;
     }
     
+    function cloneAudioBuffer(buffer) {
+        if (!buffer || !audioContext) return null;
+        const clone = audioContext.createBuffer(
+            buffer.numberOfChannels,
+            buffer.length,
+            buffer.sampleRate
+        );
+        for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+            clone.getChannelData(ch).set(buffer.getChannelData(ch));
+        }
+        return clone;
+    }
+    
     // Apply fade in/out to audio buffer
     function applyFade(audioBuffer, fadeInDuration, fadeOutDuration) {
         const sampleRate = audioBuffer.sampleRate;
@@ -461,6 +474,7 @@
   .wav-editor-waveform {
     width: 100%;
     height: 100%;
+    touch-action: none;
   }
   
   .wav-editor-selection {
@@ -850,6 +864,15 @@
     background-color: rgba(255, 255, 255, 0.3);
     border-color: rgba(255, 255, 255, 0.7);
   }
+
+  .wav-editor-app .tool-credits {
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+    font-size: .7rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
 </style>
 
 <div class="wav-editor-root">
@@ -895,20 +918,25 @@
         <input type="number" id="startTime" class="wav-editor-time-input" value="0" min="0" step="0.1" />
         <label>${isRu ? 'Конец (сек):' : 'End (sec):'}</label>
         <input type="number" id="endTime" class="wav-editor-time-input" value="0" min="0" step="0.1" />
+        <button type="button" class="wav-editor-btn" id="selectAllBtn">${isRu ? 'Выделить всё' : 'Select All'}</button>
       </div>
       
       <div class="wav-editor-control-row">
         <div class="wav-editor-playback-controls">
-          <button class="wav-editor-playback-btn" id="playBtn">${isRu ? '▶' : '▶'}</button>
-          <button class="wav-editor-playback-btn" id="pauseBtn" disabled>${isRu ? '⏸' : '⏸'}</button>
-          <button class="wav-editor-playback-btn" id="stopBtn" disabled>${isRu ? '⏹' : '⏹'}</button>
-          <button class="wav-editor-playback-btn" id="playSelectionBtn">${isRu ? '▶ Выделение' : '▶ Selection'}</button>
+          <button type="button" class="wav-editor-playback-btn" id="playBtn">${isRu ? '▶' : '▶'}</button>
+          <button type="button" class="wav-editor-playback-btn" id="pauseBtn" disabled>${isRu ? '⏸' : '⏸'}</button>
+          <button type="button" class="wav-editor-playback-btn" id="stopBtn" disabled>${isRu ? '⏹' : '⏹'}</button>
         </div>
       </div>
       
       <div class="wav-editor-control-row">
-        <button class="wav-editor-btn" id="trimBtn">${isRu ? 'Обрезать' : 'Trim'}</button>
-        <button class="wav-editor-btn" id="resetBtn">${isRu ? 'Сбросить' : 'Reset'}</button>
+        <button type="button" class="wav-editor-btn" id="trimBtn">${isRu ? 'Обрезать' : 'Trim'}</button>
+      </div>
+      
+      <div class="wav-editor-control-row">
+        <button type="button" class="wav-editor-btn" id="resetBtn">${isRu ? 'Сбросить' : 'Reset'}</button>
+        <button type="button" class="wav-editor-btn" id="undoBtn" disabled title="${isRu ? 'Отменить' : 'Undo'}">${isRu ? '← Назад' : '← Undo'}</button>
+        <button type="button" class="wav-editor-btn" id="redoBtn" disabled title="${isRu ? 'Вернуть' : 'Redo'}">${isRu ? 'Вперёд →' : 'Redo →'}</button>
       </div>
       
       <div class="wav-editor-split-controls" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
@@ -943,8 +971,8 @@
           </div>
           
           <div class="wav-editor-control-row" style="margin-top: 8px;">
-            <label>${isRu ? 'Шаг питча (полутонов):' : 'Pitch step (semitones):'}</label>
-            <input type="number" id="pitchStep" class="wav-editor-time-input" value="1" min="0.1" max="12" step="0.1" style="width: 80px;" />
+            <label title="${isRu ? 'Последний файл получает этот сдвиг от оригинала; остальные — равномерно между 0 и этим значением' : 'Last file gets this shift from original; others are evenly spaced from 0 to this value'}">${isRu ? 'Финальный питч (полутонов):' : 'Final pitch (semitones):'}</label>
+            <input type="number" id="pitchTarget" class="wav-editor-time-input" value="6" min="0.1" max="36" step="0.1" style="width: 80px;" title="${isRu ? 'Сдвиг последнего файла от оригинала' : 'Last file shift from original'}" />
           </div>
           
           <div class="wav-editor-control-row" style="margin-top: 8px;">
@@ -1010,6 +1038,7 @@
     </div>
     
     <div class="wav-editor-status" id="statusMessage"></div>
+    <div class="tool-credits">${isRu ? 'Сделано' : 'Created by'} <strong>diwoc</strong></div>
   </div>
 </div>
 `;
@@ -1023,12 +1052,14 @@
     let isPlaying = false;
     let waveformCanvas = null;
     let waveformCtx = null;
-    let isSelecting = false;
     let demoBuffer = null; // Demo buffer for when no files are loaded
     let splitMarkers = []; // Array of split marker positions (in seconds)
     let draggedMarkerIndex = -1; // Index of marker being dragged, -1 if none
     let splitParts = []; // Array of split parts after splitting: [{buffer, name, startTime, endTime}]
     let pitchFiles = []; // Array of pitch-shifted files: [{buffer, name, pitchShift}]
+    const MAX_EDIT_HISTORY = 25;
+    /** @type {Record<string, { past: any[], future: any[] }>} */
+    let editHistory = {};
     
     // IndexedDB for state persistence
     const DB_NAME = 'wavEditorDB';
@@ -1414,6 +1445,9 @@
         // Hide split parts names UI
         const namesContainer = document.getElementById('splitPartsNames');
         if (namesContainer) namesContainer.style.display = 'none';
+        
+        syncExportFilenameForActiveFile();
+        updateUndoRedoButtons();
     }
     
     function saveCurrentFileState() {
@@ -1430,6 +1464,7 @@
     }
     
     async function restoreUIFromState() {
+        editHistory = {};
         if (audioFiles.length === 0) return;
         
         // Update files list
@@ -1466,14 +1501,9 @@
         requestAnimationFrame(() => {
             drawWaveform(file.currentBuffer);
             updateSelectionDisplay();
+            syncExportFilenameForActiveFile();
+            updateUndoRedoButtons();
         });
-        
-        // Set default filename based on loaded file
-        const exportFilenameInput = document.getElementById('exportFilename');
-        if (exportFilenameInput) {
-            const baseName = file.name.replace(/\.[^/.]+$/, '');
-            exportFilenameInput.value = baseName + '.wav';
-        }
     }
     
     function loadFileState(file) {
@@ -1510,6 +1540,14 @@
         if (channels) channels.textContent = file.currentBuffer.numberOfChannels;
     }
     
+    function syncExportFilenameForActiveFile() {
+        const file = getActiveFile();
+        const exportFilenameInput = document.getElementById('exportFilename');
+        if (!file || !exportFilenameInput) return;
+        const baseName = file.name.replace(/\.[^/.]+$/, '');
+        exportFilenameInput.value = baseName + '.wav';
+    }
+    
     function removeFile(fileId) {
         const lang = getLanguage();
         const isRu = lang === 'ru';
@@ -1521,6 +1559,7 @@
         
         // Remove file
         audioFiles = audioFiles.filter(f => f.id !== fileId);
+        delete editHistory[fileId];
         
         // Switch to another file if needed
         if (fileId === activeFileId) {
@@ -1540,6 +1579,9 @@
                 if (exportOptions) exportOptions.style.display = 'none';
                 if (volumeControl) volumeControl.style.display = 'none';
                 if (audioInfo) audioInfo.style.display = 'none';
+                clearSplitMarkers();
+                splitParts = [];
+                updateUndoRedoButtons();
             }
         }
         
@@ -1780,6 +1822,169 @@
         if (stopBtn) stopBtn.disabled = false;
     }
     
+    function showSplitPartsNamesUI() {
+        const namesContainer = document.getElementById('splitPartsNames');
+        if (!namesContainer) return;
+        
+        const lang = getLanguage();
+        const isRu = lang === 'ru';
+        
+        namesContainer.style.display = 'block';
+        namesContainer.innerHTML = '<div style="font-size: 0.85rem; color: rgba(255, 255, 255, 0.8); margin-bottom: 8px;">' +
+            (isRu ? 'Имена частей:' : 'Part names:') + '</div>';
+        
+        splitParts.forEach((part, index) => {
+            const row = document.createElement('div');
+            row.className = 'wav-editor-control-row';
+            row.style.marginTop = '6px';
+            
+            const label = document.createElement('label');
+            label.textContent = `${isRu ? 'Часть' : 'Part'} ${index + 1}:`;
+            label.style.minWidth = '70px';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'wav-editor-filename-input';
+            input.value = part.name;
+            input.style.flex = '1';
+            input.addEventListener('change', (e) => {
+                splitParts[index].name = e.target.value || part.name;
+            });
+            
+            const previewBtn = document.createElement('button');
+            previewBtn.type = 'button';
+            previewBtn.className = 'wav-editor-playback-btn';
+            previewBtn.textContent = isRu ? '▶' : '▶';
+            previewBtn.title = isRu ? 'Прослушать часть' : 'Preview part';
+            previewBtn.style.marginLeft = '8px';
+            previewBtn.addEventListener('click', () => {
+                stopPlayback();
+                playAudioBuffer(part.buffer);
+            });
+            
+            row.appendChild(label);
+            row.appendChild(input);
+            row.appendChild(previewBtn);
+            namesContainer.appendChild(row);
+        });
+    }
+    
+    function createEditSnapshot() {
+        const file = getActiveFile();
+        if (!file || !file.currentBuffer || !audioContext) return null;
+        const bufClone = cloneAudioBuffer(file.currentBuffer);
+        if (!bufClone) return null;
+        return {
+            currentBuffer: bufClone,
+            selectionStart: file.selectionStart,
+            selectionEnd: file.selectionEnd,
+            volume: file.volume,
+            splitMarkers: splitMarkers.slice(),
+            splitParts: splitParts.map(p => ({
+                name: p.name,
+                startTime: p.startTime,
+                endTime: p.endTime,
+                buffer: cloneAudioBuffer(p.buffer)
+            }))
+        };
+    }
+    
+    function applyEditSnapshot(snap) {
+        if (!snap) return;
+        const file = getActiveFile();
+        if (!file) return;
+        stopPlayback();
+        file.currentBuffer = snap.currentBuffer;
+        file.selectionStart = snap.selectionStart;
+        file.selectionEnd = snap.selectionEnd;
+        file.volume = snap.volume;
+        splitMarkers = snap.splitMarkers.slice();
+        splitParts = (snap.splitParts || []).map(p => ({
+            name: p.name,
+            startTime: p.startTime,
+            endTime: p.endTime,
+            buffer: p.buffer
+        }));
+        
+        loadFileState(file);
+        updateFileInfo(file);
+        drawWaveform(file.currentBuffer);
+        updateSelectionDisplay();
+        
+        const splitBtnEl = document.getElementById('splitBtn');
+        if (splitBtnEl) splitBtnEl.style.display = splitMarkers.length > 0 ? 'inline-block' : 'none';
+        
+        const namesContainer = document.getElementById('splitPartsNames');
+        if (namesContainer) {
+            if (splitParts.length > 0) {
+                showSplitPartsNamesUI();
+            } else {
+                namesContainer.style.display = 'none';
+                namesContainer.innerHTML = '';
+            }
+        }
+        
+        syncExportFilenameForActiveFile();
+        updateUndoRedoButtons();
+        saveState().catch(err => console.error('Failed to save state:', err));
+    }
+    
+    function pushEditHistoryBeforeChange() {
+        const file = getActiveFile();
+        if (!file || !audioContext) return;
+        const snap = createEditSnapshot();
+        if (!snap) return;
+        if (!editHistory[file.id]) {
+            editHistory[file.id] = { past: [], future: [] };
+        }
+        const h = editHistory[file.id];
+        h.past.push(snap);
+        if (h.past.length > MAX_EDIT_HISTORY) h.past.shift();
+        h.future = [];
+        updateUndoRedoButtons();
+    }
+    
+    function updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        if (!undoBtn || !redoBtn) return;
+        const file = getActiveFile();
+        if (!file || !editHistory[file.id]) {
+            undoBtn.disabled = true;
+            redoBtn.disabled = true;
+            return;
+        }
+        const h = editHistory[file.id];
+        undoBtn.disabled = h.past.length === 0;
+        redoBtn.disabled = h.future.length === 0;
+    }
+    
+    function performUndo() {
+        if (!hasActiveFile()) return;
+        const file = getActiveFile();
+        if (!file || !editHistory[file.id] || editHistory[file.id].past.length === 0) return;
+        const h = editHistory[file.id];
+        const current = createEditSnapshot();
+        const prev = h.past.pop();
+        if (current) h.future.push(current);
+        applyEditSnapshot(prev);
+        const lang = getLanguage();
+        showStatus(lang === 'ru' ? 'Отменено' : 'Undone', 'info');
+    }
+    
+    function performRedo() {
+        if (!hasActiveFile()) return;
+        const file = getActiveFile();
+        if (!file || !editHistory[file.id] || editHistory[file.id].future.length === 0) return;
+        const h = editHistory[file.id];
+        const current = createEditSnapshot();
+        const next = h.future.pop();
+        if (current) h.past.push(current);
+        if (next) applyEditSnapshot(next);
+        const lang = getLanguage();
+        showStatus(lang === 'ru' ? 'Возвращено' : 'Redone', 'info');
+    }
+    
     async function loadWavEditorTool() {
         const wavEditorToolContent = document.getElementById('wavEditorToolContent');
         if (!wavEditorToolContent) return;
@@ -1803,7 +2008,7 @@
         const playBtn = document.getElementById('playBtn');
         const pauseBtn = document.getElementById('pauseBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const playSelectionBtn = document.getElementById('playSelectionBtn');
+        const selectAllBtn = document.getElementById('selectAllBtn');
         const exportBtn = document.getElementById('exportBtn');
         const startTimeInput = document.getElementById('startTime');
         const endTimeInput = document.getElementById('endTime');
@@ -1891,13 +2096,8 @@
                         updateSelectionDisplay();
                     });
                     
-                    // Set default filename based on loaded file
-                    const exportFilenameInput = document.getElementById('exportFilename');
-                    if (exportFilenameInput) {
-                        // Extract name without extension and add .wav
-                        const baseName = actualFileName.replace(/\.[^/.]+$/, '');
-                        exportFilenameInput.value = baseName + '.wav';
-                    }
+                    syncExportFilenameForActiveFile();
+                    updateUndoRedoButtons();
                 }
                 
                 // Hide demo if files were loaded
@@ -1941,67 +2141,224 @@
             });
         }
         
-        // Waveform selection
+        // Waveform selection: new range (any direction), or drag left/right edges
         if (waveformCanvas) {
-            waveformCanvas.addEventListener('mousedown', (e) => {
+            const MIN_SEL_SEC = 0.001;
+            
+            let selectionPointerActive = false;
+            /** @type {'new' | 'edge-left' | 'edge-right'} */
+            let selectionDragMode = 'new';
+            let selectionAnchorTime = 0;
+            
+            function edgeThresholdPx(rect) {
+                return Math.max(10, Math.min(22, rect.width * 0.022));
+            }
+            
+            function timeFromClientX(clientX, buffer, rect) {
+                const x = clientX - rect.left;
+                const percent = Math.max(0, Math.min(1, x / rect.width));
+                return percent * buffer.duration;
+            }
+            
+            function minSelGap(buffer) {
+                return Math.max(MIN_SEL_SEC, 2 / buffer.sampleRate);
+            }
+            
+            function pickEdgeMode(x, rect, leftPx, rightPx) {
+                const EDGE = edgeThresholdPx(rect);
+                const distL = Math.abs(x - leftPx);
+                const distR = Math.abs(x - rightPx);
+                const nearL = distL <= EDGE;
+                const nearR = distR <= EDGE;
+                if (nearL && nearR) {
+                    return distL <= distR ? 'edge-left' : 'edge-right';
+                }
+                if (nearL) return 'edge-left';
+                if (nearR) return 'edge-right';
+                return null;
+            }
+            
+            function teardownSelectionDocListeners() {
+                document.removeEventListener('mousemove', onSelectionDocMove);
+                document.removeEventListener('mouseup', onSelectionDocUp);
+                document.removeEventListener('touchmove', onSelectionDocMove);
+                document.removeEventListener('touchend', onSelectionDocUp);
+                document.removeEventListener('touchcancel', onSelectionDocUp);
+            }
+            
+            function onSelectionDocUp() {
+                if (selectionPointerActive && hasActiveFile()) {
+                    saveState().catch(err => console.error('Failed to save state:', err));
+                }
+                selectionPointerActive = false;
+                teardownSelectionDocListeners();
+                if (waveformCanvas) {
+                    waveformCanvas.style.cursor = '';
+                }
+            }
+            
+            function onSelectionDocMove(e) {
+                if (!selectionPointerActive || !waveformCanvas) return;
                 const buffer = getActiveBuffer();
                 if (!buffer) return;
                 const rect = waveformCanvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const percent = x / rect.width;
+                const clientX = e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX;
+                const t = timeFromClientX(clientX, buffer, rect);
+                const dur = buffer.duration;
+                const gap = minSelGap(buffer);
                 
                 if (hasActiveFile()) {
                     const file = getActiveFile();
-                    file.selectionStart = percent * buffer.duration;
-                    file.selectionEnd = file.selectionStart;
-                    if (startTimeInput) startTimeInput.value = file.selectionStart.toFixed(2);
-                    if (endTimeInput) endTimeInput.value = file.selectionEnd.toFixed(2);
+                    if (!file) return;
+                    if (selectionDragMode === 'new') {
+                        const a = selectionAnchorTime;
+                        const lo = Math.max(0, Math.min(a, t));
+                        const hi = Math.min(dur, Math.max(a, t));
+                        file.selectionStart = lo;
+                        file.selectionEnd = hi;
+                        if (startTimeInput) startTimeInput.value = lo.toFixed(2);
+                        if (endTimeInput) endTimeInput.value = hi.toFixed(2);
+                    } else if (selectionDragMode === 'edge-left') {
+                        const newStart = Math.max(0, Math.min(t, file.selectionEnd - gap));
+                        file.selectionStart = newStart;
+                        if (startTimeInput) startTimeInput.value = newStart.toFixed(2);
+                    } else if (selectionDragMode === 'edge-right') {
+                        const newEnd = Math.min(dur, Math.max(t, file.selectionStart + gap));
+                        file.selectionEnd = newEnd;
+                        if (endTimeInput) endTimeInput.value = newEnd.toFixed(2);
+                    }
                 } else {
-                    // Demo mode
-                    if (startTimeInput) startTimeInput.value = (percent * buffer.duration).toFixed(2);
-                    if (endTimeInput) endTimeInput.value = (percent * buffer.duration).toFixed(2);
+                    let st = parseFloat(startTimeInput?.value || 0);
+                    let en = parseFloat(endTimeInput?.value || dur);
+                    if (selectionDragMode === 'new') {
+                        const a = selectionAnchorTime;
+                        st = Math.max(0, Math.min(a, t));
+                        en = Math.min(dur, Math.max(a, t));
+                    } else if (selectionDragMode === 'edge-left') {
+                        st = Math.max(0, Math.min(t, en - gap));
+                    } else if (selectionDragMode === 'edge-right') {
+                        en = Math.min(dur, Math.max(t, st + gap));
+                    }
+                    if (startTimeInput) {
+                        startTimeInput.value = st.toFixed(2);
+                        startTimeInput.max = dur.toFixed(2);
+                    }
+                    if (endTimeInput) {
+                        endTimeInput.value = en.toFixed(2);
+                        endTimeInput.max = dur.toFixed(2);
+                    }
+                }
+                updateSelectionDisplay();
+            }
+            
+            function beginSelectionPointer(e, clientX) {
+                if (selectionPointerActive) {
+                    onSelectionDocUp();
+                }
+                const buffer = getActiveBuffer();
+                if (!buffer) return;
+                const rect = waveformCanvas.getBoundingClientRect();
+                const x = clientX - rect.left;
+                const t = timeFromClientX(clientX, buffer, rect);
+                const dur = buffer.duration;
+                const gap = minSelGap(buffer);
+                
+                selectionAnchorTime = t;
+                selectionDragMode = 'new';
+                
+                if (hasActiveFile()) {
+                    const file = getActiveFile();
+                    const leftPx = (file.selectionStart / dur) * rect.width;
+                    const rightPx = (file.selectionEnd / dur) * rect.width;
+                    const span = file.selectionEnd - file.selectionStart;
+                    const edge = span >= gap ? pickEdgeMode(x, rect, leftPx, rightPx) : null;
+                    if (edge) {
+                        selectionDragMode = edge;
+                    } else {
+                        file.selectionStart = t;
+                        file.selectionEnd = t;
+                        selectionAnchorTime = t;
+                        if (startTimeInput) startTimeInput.value = t.toFixed(2);
+                        if (endTimeInput) endTimeInput.value = t.toFixed(2);
+                    }
+                } else {
+                    let st = parseFloat(startTimeInput?.value || 0);
+                    let en = parseFloat(endTimeInput?.value || dur);
+                    const leftPx = (st / dur) * rect.width;
+                    const rightPx = (en / dur) * rect.width;
+                    const span = en - st;
+                    const edge = span >= gap ? pickEdgeMode(x, rect, leftPx, rightPx) : null;
+                    if (edge) {
+                        selectionDragMode = edge;
+                    } else {
+                        selectionAnchorTime = t;
+                        if (startTimeInput) {
+                            startTimeInput.value = t.toFixed(2);
+                            startTimeInput.max = dur.toFixed(2);
+                        }
+                        if (endTimeInput) {
+                            endTimeInput.value = t.toFixed(2);
+                            endTimeInput.max = dur.toFixed(2);
+                        }
+                    }
                 }
                 
-                isSelecting = true;
+                selectionPointerActive = true;
+                waveformCanvas.style.cursor = selectionDragMode.startsWith('edge') ? 'grabbing' : 'crosshair';
+                document.addEventListener('mousemove', onSelectionDocMove);
+                document.addEventListener('mouseup', onSelectionDocUp);
+                document.addEventListener('touchmove', onSelectionDocMove, { passive: true });
+                document.addEventListener('touchend', onSelectionDocUp);
+                document.addEventListener('touchcancel', onSelectionDocUp);
                 updateSelectionDisplay();
+            }
+            
+            waveformCanvas.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                beginSelectionPointer(e, e.clientX);
             });
+            
+            waveformCanvas.addEventListener('touchstart', (e) => {
+                if (!e.touches || !e.touches[0]) return;
+                beginSelectionPointer(e, e.touches[0].clientX);
+            }, { passive: true });
             
             waveformCanvas.addEventListener('mousemove', (e) => {
+                if (selectionPointerActive) return;
                 const buffer = getActiveBuffer();
-                if (!isSelecting || !buffer) return;
+                if (!buffer || !waveformCanvas) return;
                 const rect = waveformCanvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
-                const percent = x / rect.width;
+                const dur = buffer.duration;
+                const gap = minSelGap(buffer);
+                let showGrab = false;
                 
                 if (hasActiveFile()) {
                     const file = getActiveFile();
-                    const start = file.selectionStart;
-                    file.selectionEnd = Math.max(start, percent * buffer.duration);
-                    if (endTimeInput) endTimeInput.value = file.selectionEnd.toFixed(2);
+                    const leftPx = (file.selectionStart / dur) * rect.width;
+                    const rightPx = (file.selectionEnd / dur) * rect.width;
+                    const span = file.selectionEnd - file.selectionStart;
+                    if (span >= gap && pickEdgeMode(x, rect, leftPx, rightPx)) {
+                        showGrab = true;
+                    }
                 } else {
-                    // Demo mode
-                    const start = parseFloat(startTimeInput?.value || 0);
-                    const end = Math.max(start, percent * buffer.duration);
-                    if (endTimeInput) endTimeInput.value = end.toFixed(2);
+                    const st = parseFloat(startTimeInput?.value || 0);
+                    const en = parseFloat(endTimeInput?.value || dur);
+                    const leftPx = (st / dur) * rect.width;
+                    const rightPx = (en / dur) * rect.width;
+                    const span = en - st;
+                    if (span >= gap && pickEdgeMode(x, rect, leftPx, rightPx)) {
+                        showGrab = true;
+                    }
                 }
                 
-                updateSelectionDisplay();
-            });
-            
-            waveformCanvas.addEventListener('mouseup', () => {
-                if (isSelecting && hasActiveFile()) {
-                    // Save state after finishing selection
-                    saveState().catch(err => console.error('Failed to save state:', err));
-                }
-                isSelecting = false;
+                waveformCanvas.style.cursor = showGrab ? 'grab' : '';
             });
             
             waveformCanvas.addEventListener('mouseleave', () => {
-                if (isSelecting && hasActiveFile()) {
-                    // Save state after finishing selection
-                    saveState().catch(err => console.error('Failed to save state:', err));
+                if (!selectionPointerActive) {
+                    waveformCanvas.style.cursor = '';
                 }
-                isSelecting = false;
             });
         }
         
@@ -2073,6 +2430,7 @@
                 if (!file || !file.currentBuffer) return;
                 
                 try {
+                    pushEditHistoryBeforeChange();
                     file.currentBuffer = extractSegment(file.currentBuffer, file.selectionStart, file.selectionEnd);
                     drawWaveform(file.currentBuffer);
                     
@@ -2102,6 +2460,7 @@
                 const file = getActiveFile();
                 if (!file || !file.originalBuffer) return;
                 
+                pushEditHistoryBeforeChange();
                 file.currentBuffer = file.originalBuffer;
                 file.selectionStart = 0;
                 file.selectionEnd = file.originalBuffer.duration;
@@ -2130,6 +2489,21 @@
                 const lang = getLanguage();
                 const isRu = lang === 'ru';
                 showStatus(isRu ? 'Сброшено к оригиналу' : 'Reset to original', 'info');
+            });
+        }
+        
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => {
+                if (!hasActiveFile()) return;
+                performUndo();
+            });
+        }
+        if (redoBtn) {
+            redoBtn.addEventListener('click', () => {
+                if (!hasActiveFile()) return;
+                performRedo();
             });
         }
         
@@ -2164,6 +2538,7 @@
                     return;
                 }
                 
+                pushEditHistoryBeforeChange();
                 createSplitMarkers(numParts);
                 
                 const lang = getLanguage();
@@ -2194,6 +2569,7 @@
                 }
                 
                 try {
+                    pushEditHistoryBeforeChange();
                     // Sort markers and add selection boundaries
                     const allMarkers = [file.selectionStart, ...splitMarkers, file.selectionEnd].sort((a, b) => a - b);
                     
@@ -2292,41 +2668,6 @@
                 });
             }
         }
-        
-    function showSplitPartsNamesUI() {
-        const namesContainer = document.getElementById('splitPartsNames');
-        if (!namesContainer) return;
-        
-        const lang = getLanguage();
-        const isRu = lang === 'ru';
-        
-        namesContainer.style.display = 'block';
-        namesContainer.innerHTML = '<div style="font-size: 0.85rem; color: rgba(255, 255, 255, 0.8); margin-bottom: 8px;">' + 
-            (isRu ? 'Имена частей:' : 'Part names:') + '</div>';
-        
-        splitParts.forEach((part, index) => {
-            const row = document.createElement('div');
-            row.className = 'wav-editor-control-row';
-            row.style.marginTop = '6px';
-            
-            const label = document.createElement('label');
-            label.textContent = `${isRu ? 'Часть' : 'Part'} ${index + 1}:`;
-            label.style.minWidth = '70px';
-            
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'wav-editor-filename-input';
-            input.value = part.name;
-            input.style.flex = '1';
-            input.addEventListener('change', (e) => {
-                splitParts[index].name = e.target.value || part.name;
-            });
-            
-            row.appendChild(label);
-            row.appendChild(input);
-            namesContainer.appendChild(row);
-        });
-    }
     
         // Preview fade button
         const previewFadeBtn = document.getElementById('previewFadeBtn');
@@ -2432,8 +2773,8 @@
                         return;
                     }
                     
-                    // Split selection into parts (get number from split input)
-                    const numParts = parseInt(splitPartsInput?.value) || 4;
+                    pushEditHistoryBeforeChange();
+                    const numParts = parseInt(splitPartsCountInput?.value) || 4;
                     const parts = splitSegment(file.currentBuffer, file.selectionStart, file.selectionEnd, numParts);
                     
                     // Apply fade to each part
@@ -2477,10 +2818,26 @@
             });
         }
         
-        // Playback controls
+        // Playback controls — play always uses current selection (or demo range)
         if (playBtn) {
             playBtn.addEventListener('click', () => {
-                playAudio(0);
+                const buffer = getActiveBuffer();
+                if (!buffer) return;
+                
+                let start = 0;
+                let end = buffer.duration;
+                
+                if (hasActiveFile()) {
+                    const file = getActiveFile();
+                    if (!file) return;
+                    start = file.selectionStart;
+                    end = file.selectionEnd;
+                } else {
+                    start = parseFloat(startTimeInput?.value || 0);
+                    end = parseFloat(endTimeInput?.value || buffer.duration);
+                }
+                
+                playAudio(start, end);
             });
         }
         
@@ -2496,25 +2853,40 @@
             });
         }
         
-        if (playSelectionBtn) {
-            playSelectionBtn.addEventListener('click', () => {
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', () => {
                 const buffer = getActiveBuffer();
                 if (!buffer) return;
                 
-                let start = 0;
-                let end = buffer.duration;
+                const dur = buffer.duration;
+                const durStr = dur.toFixed(2);
                 
                 if (hasActiveFile()) {
                     const file = getActiveFile();
-                    start = file.selectionStart;
-                    end = file.selectionEnd;
+                    if (!file) return;
+                    file.selectionStart = 0;
+                    file.selectionEnd = dur;
+                    if (startTimeInput) {
+                        startTimeInput.value = '0';
+                        startTimeInput.max = durStr;
+                    }
+                    if (endTimeInput) {
+                        endTimeInput.value = durStr;
+                        endTimeInput.max = durStr;
+                    }
+                    updateSelectionDisplay();
+                    saveState().catch(err => console.error('Failed to save state:', err));
                 } else {
-                    // Demo mode
-                    start = parseFloat(startTimeInput?.value || 0);
-                    end = parseFloat(endTimeInput?.value || buffer.duration);
+                    if (startTimeInput) {
+                        startTimeInput.value = '0';
+                        startTimeInput.max = durStr;
+                    }
+                    if (endTimeInput) {
+                        endTimeInput.value = durStr;
+                        endTimeInput.max = durStr;
+                    }
+                    updateDemoSelectionDisplay();
                 }
-                
-                playAudio(start, end);
             });
         }
         
@@ -2541,6 +2913,7 @@
                 if (!file || !file.currentBuffer || !volumeSlider) return;
                 
                 try {
+                    pushEditHistoryBeforeChange();
                     const volumePercent = parseInt(volumeSlider.value);
                     file.currentBuffer = changeVolume(file.currentBuffer, volumePercent);
                     file.volume = volumePercent;
@@ -2783,7 +3156,7 @@
         const cancelPitchBtn = document.getElementById('cancelPitchBtn');
         const downloadPitchBtn = document.getElementById('downloadPitchBtn');
         const pitchFilesCountInput = document.getElementById('pitchFilesCount');
-        const pitchStepInput = document.getElementById('pitchStep');
+        const pitchTargetInput = document.getElementById('pitchTarget');
         const pitchDirectionSelect = document.getElementById('pitchDirection');
         const pitchPk3FilenameInput = document.getElementById('pitchPk3Filename');
         const pitchPk3PathInput = document.getElementById('pitchPk3Path');
@@ -2823,7 +3196,7 @@
             });
         }
         
-        if (generatePitchBtn && pitchFilesCountInput && pitchStepInput && pitchDirectionSelect) {
+        if (generatePitchBtn && pitchFilesCountInput && pitchTargetInput && pitchDirectionSelect) {
             generatePitchBtn.addEventListener('click', async () => {
                 if (!hasActiveFile()) {
                     const lang = getLanguage();
@@ -2852,15 +3225,16 @@
                         return;
                     }
                     
-                    const pitchStep = parseFloat(pitchStepInput.value) || 1;
-                    if (pitchStep <= 0 || pitchStep > 12) {
+                    const pitchFinal = parseFloat(pitchTargetInput.value);
+                    if (!(pitchFinal > 0) || pitchFinal > 36) {
                         const lang = getLanguage();
                         const isRu = lang === 'ru';
-                        showStatus(isRu ? 'Шаг питча должен быть от 0.1 до 12 полутонов' : 'Pitch step must be between 0.1 and 12 semitones', 'error');
+                        showStatus(isRu ? 'Финальный питч: от 0.1 до 36 полутонов' : 'Final pitch must be between 0.1 and 36 semitones', 'error');
                         return;
                     }
                     
                     const direction = pitchDirectionSelect.value;
+                    const sign = direction === 'up' ? 1 : -1;
                     
                     // Extract selected segment
                     const segmentBuffer = extractSegment(file.currentBuffer, file.selectionStart, file.selectionEnd);
@@ -2872,19 +3246,18 @@
                     const isRu = lang === 'ru';
                     showStatus(isRu ? 'Генерация файлов с питчем...' : 'Generating pitch files...', 'info');
                     
-                    // Generate pitch-shifted files
+                    // Generate pitch-shifted files: evenly from 0 to sign * pitchFinal (last file)
                     pitchFiles = [];
                     for (let i = 0; i < numFiles; i++) {
                         let pitchShift = 0;
-                        if (direction === 'up') {
-                            pitchShift = i * pitchStep;
+                        if (numFiles === 1) {
+                            pitchShift = sign * pitchFinal;
                         } else {
-                            pitchShift = -i * pitchStep;
+                            pitchShift = sign * (i / (numFiles - 1)) * pitchFinal;
                         }
                         
                         let pitchShiftedBuffer;
                         if (pitchShift === 0) {
-                            // No pitch change for first file
                             pitchShiftedBuffer = segmentBuffer;
                         } else {
                             pitchShiftedBuffer = await changePitch(segmentBuffer, pitchShift);

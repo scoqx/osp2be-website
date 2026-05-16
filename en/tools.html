@@ -45,13 +45,6 @@
                 <h1>Tools</h1>
             </div>
             
-            <div class="tool-section clickable" id="openConfigEditorModal">
-                <h2>Config Editor</h2>
-                <p style="margin: 0; color: rgba(255, 255, 255, 0.7); font-size: 0.8rem;">
-                    Edit config files
-                </p>
-            </div>
-            
             <div class="tool-section clickable" id="openSkyboxModal">
                 <h2>Q3 SKYBOX TOOL</h2>
                 <p style="margin: 0; color: rgba(255, 255, 255, 0.7); font-size: 0.8rem;">
@@ -73,6 +66,13 @@
                 </p>
             </div>
             
+            <div class="tool-section clickable" id="openMd3ModelModal">
+                <h2>Q3 Model Inspector</h2>
+                <p style="margin: 0; color: rgba(255, 255, 255, 0.7); font-size: 0.8rem;">
+                    MD3 surfaces and shader names (no 3D preview)
+                </p>
+            </div>
+            
             <!-- Font Maker - временно отключен -->
             <!-- <div class="tool-section clickable" id="openFontMakerModal">
                 <h2>OSP2 Font Maker</h2>
@@ -82,12 +82,12 @@
             </div> -->
             
             <!-- WAV Editor - временно отключен -->
-            <!-- <div class="tool-section clickable" id="openWavEditorModal">
+            <div class="tool-section clickable" id="openWavEditorModal">
                 <h2>WAV Editor</h2>
                 <p style="margin: 0; color: rgba(255, 255, 255, 0.7); font-size: 0.8rem;">
                     Audio editor and converter to WAV format for Quake 3 Arena
                 </p>
-            </div> -->
+            </div>
             
         </div>
     </main>
@@ -122,6 +122,14 @@
         </div>
     </div>
 
+    <!-- Q3 Model Inspector Modal -->
+    <div class="donation-modal" id="md3ModelModal">
+        <div class="donation-modal-content" style="max-width: 1100px; width: 95%; text-align: left; max-height: 90vh; overflow-y: auto; padding: 0;">
+            <button class="donation-modal-close" id="closeMd3ModelModal">&times;</button>
+            <div id="md3ModelToolContent" style="padding: 18px 20px 16px;"></div>
+        </div>
+    </div>
+
     <!-- Font Maker Modal - временно отключен -->
     <!-- <div class="donation-modal" id="fontMakerModal">
         <div class="donation-modal-content" style="max-width: 1400px; width: 98%; text-align: left; max-height: 90vh; overflow-y: auto; padding: 0;">
@@ -133,149 +141,11 @@
     </div> -->
 
     <!-- WAV Editor Modal - временно отключен -->
-    <!-- <div class="donation-modal" id="wavEditorModal">
+    <div class="donation-modal" id="wavEditorModal">
         <div class="donation-modal-content" style="max-width: 1200px; width: 95%; text-align: left; max-height: 90vh; overflow-y: auto; padding: 0;">
             <button class="donation-modal-close" id="closeWavEditorModal">&times;</button>
             <div id="wavEditorToolContent" style="padding: 18px 20px 16px;">
                 <!- Content will be loaded here ->
-            </div>
-        </div>
-    </div> -->
-
-    <!-- Config Editor Modal -->
-    <div class="donation-modal" id="configEditorModal">
-        <div class="donation-modal-content" style="max-width: 1200px; width: 95%; text-align: left; max-height: 90vh; overflow-y: auto; overflow-x: hidden;">
-            <button class="donation-modal-close" id="closeConfigEditorModal">&times;</button>
-            <div style="position: relative; margin-bottom: var(--spacing-sm);">
-                <h3 style="text-align: center; margin: 0;">Config Editor</h3>
-                <button id="clearConfigEditorButton" class="sort-button" style="position: absolute; right: var(--spacing-lg); top: 50%; transform: translateY(-50%); display: none;">Clear</button>
-            </div>
-            
-            <div class="cfg-injector-container" style="background-color: rgba(255, 255, 255, 0.05); border: 2px solid var(--border-color); border-radius: var(--border-radius); padding: var(--spacing-md);">
-                <div class="file-selectors">
-                    <div class="file-selector">
-                        <label for="sourceFiles">Source Files</label>
-                        <div class="file-input-wrapper">
-                            <input type="file" id="sourceFiles" class="file-input" multiple accept=".cfg,.txt">
-                            <div class="file-drop-zone" id="sourceDropZone" data-target="source">
-                                <div class="file-drop-zone-text">Click / Drop / Ctrl+V<br><span class="file-drop-zone-ext">cfg or txt</span></div>
-                            </div>
-                        </div>
-                        <div class="file-list" id="sourceFileList"></div>
-                    </div>
-                    
-                    <div class="file-selector">
-                        <label for="targetFile">Target Config</label>
-                        <div class="file-input-wrapper">
-                            <input type="file" id="targetFile" class="file-input" accept=".cfg,.txt">
-                            <div class="file-drop-zone" id="targetDropZone" data-target="target">
-                                <div class="file-drop-zone-text">Click / Drop / Ctrl+V<br><span class="file-drop-zone-ext">cfg or txt</span></div>
-                            </div>
-                        </div>
-                        <div class="file-list" id="targetFileList"></div>
-                    </div>
-                </div>
-                
-                <div class="filter-section">
-                    <label class="filter-section-title">Filters:</label>
-                    
-                    <div class="filter-options">
-                        <div class="filter-option-item">
-                            <input type="checkbox" id="ignoreNewCommands">
-                            <label for="ignoreNewCommands">New lines</label>
-                        </div>
-                        <div class="filter-option-item">
-                            <input type="checkbox" id="ignoreUpdatedCommands">
-                            <label for="ignoreUpdatedCommands">Changes</label>
-                        </div>
-                    </div>
-                    
-                    <label class="filter-section-title">Categories:</label>
-                    <div class="ignore-categories-grid">
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreR" data-category="r_">
-                            <label for="ignoreR">r_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreCg" data-category="cg_">
-                            <label for="ignoreCg">cg_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreS" data-category="s_">
-                            <label for="ignoreS">s_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreCl" data-category="cl_">
-                            <label for="ignoreCl">cl_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreCom" data-category="com_">
-                            <label for="ignoreCom">com_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreCh" data-category="ch_">
-                            <label for="ignoreCh">ch_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreSv" data-category="sv_">
-                            <label for="ignoreSv">sv_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreUi" data-category="ui_">
-                            <label for="ignoreUi">ui_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreX" data-category="x_">
-                            <label for="ignoreX">x_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreBind" data-category="bind">
-                            <label for="ignoreBind">bind</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreVstr" data-category="vstr">
-                            <label for="ignoreVstr">vstr</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreSet" data-category="set">
-                            <label for="ignoreSet">set</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreCustom" data-category="custom">
-                            <label for="ignoreCustom">Custom</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreG" data-category="g_">
-                            <label for="ignoreG">g_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignorePmove" data-category="pmove_">
-                            <label for="ignorePmove">pmove_*</label>
-                        </div>
-                        <div class="ignore-category-item">
-                            <input type="checkbox" id="ignoreServerGame" data-category="server_game">
-                            <label for="ignoreServerGame">Game</label>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="preview-header-controls" id="previewHeaderControls" style="display: none;">
-                        <h4 style="margin: 0;">Preview Changes:</h4>
-                        <div style="display: flex; gap: var(--spacing-sm);">
-                            <button id="sortPreviewButton" class="sort-button">Sort</button>
-                            <button id="hideIgnoredButton" class="sort-button">Hide ignored</button>
-                        </div>
-                    </div>
-                
-                <div id="previewContainer" class="preview-container" style="display: none;">
-                    <div id="previewContent" class="changes-preview">
-                        <!-- Preview content will be loaded here -->
-                    </div>
-                </div>
-                
-                <button id="processButton" class="process-button">Process</button>
-                
-                <div id="statusMessage" class="status-message"></div>
             </div>
         </div>
     </div>
@@ -284,11 +154,10 @@
     <script src="/scripts/language-manager.js?v=1.3"></script>
     <script src="/scripts/navigation.js?v=1.3"></script>
     <script src="/scripts/change-tracker.js?v=1.0"></script>
-    <script src="/scripts/cfg-injector.js?v=1.3"></script>
-    <script src="/scripts/cfge-modal.js?v=1.3"></script>
     <script src="/scripts/skybox-modal.js?v=1.3"></script>
     <script src="/scripts/menuhq-modal.js?v=1.2"></script>
     <script src="/scripts/q3-sens-calc-modal.js?v=1.0"></script>
+    <script src="/scripts/md3-model-modal.js?v=1.7"></script>
     <!-- Font Maker scripts - временно отключены -->
     <!-- <script src="/scripts/font-maker/state.js?v=1.0"></script>
     <script src="/scripts/font-maker/render.js?v=1.0"></script>
@@ -297,7 +166,7 @@
     <script src="/scripts/font-maker/app.js?v=1.0"></script>
     <script src="/scripts/font-maker-modal.js?v=1.0"></script> -->
     <!-- WAV Editor script - временно отключен -->
-    <!-- <script src="/scripts/wav-editor-modal.js?v=1.0"></script> -->
+    <script src="/scripts/wav-editor-modal.js?v=1.4"></script>
     <script src="/scripts/tga.js?v=1.4"></script>
     
     <!-- Simple Analytics - 100% privacy-first analytics -->
